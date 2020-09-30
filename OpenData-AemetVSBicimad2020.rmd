@@ -1,0 +1,343 @@
+---
+title: "Datos AEMET/ BICIMAD 2020"
+author: "by [Juan Manuel Ortiz](https://www.linkedin.com/in/juan-manuel-ortiz-10956a80/)"
+date: "27/7/2020"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    toc: yes
+    toc_depth: 5
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+linkedin: https://www.linkedin.com/in/juan-manuel-ortiz-10956a80/
+github: https://github.com/juanmick
+---
+
+En este ejemplo me propongo obtener los datos meteorologicos de AEMET en Madrid durante los primeros 6 meses y contrastarlos con los de Bicimad.
+
+Haremos uso del Open Data, obteniendo los datos de diversas maneras, para posteriormente hacer un breve contraste y analisis.
+
+## Preparación librerias
+
+Cargamos las librerias necesarias para realizar este proyecto
+
+```{r message=FALSE, warning=FALSE}
+library(jsonlite)
+library(RCurl)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(quantreg)
+library(utils)
+library(hrbrthemes)
+
+```
+
+
+## Obtener datos
+
+En este punto procedemos a la descarga de los datos y descomprimimos. Posteriormente la información de los archivos JSON es extraida y convertida a un único dataframe. Como el proceso es largo y tedioso dependiendo de nuestros equipos, sugiero saltarse este punto y cargar directamente el archivo ya tratado
+
+
+```{r eval=FALSE}
+
+#Descargaros y descomprimimos desde la siguiente dirección los archivos que contienen los datos de uso de Bicimad desde enero hasta Junio de 2020
+
+#https://opendata.emtmadrid.es/Datos-estaticos/Datos-generales-(1)
+
+
+url <- 'https://opendata.emtmadrid.es/getattachment/fdf6b8d5-7fef-428c-b886-a21bf65f41c4/BiciMAD_movements_2020_1_5.aspx'
+destfile <- "C:/opendata/movements_2020_1_5.zip"
+download.file(url, destfile,mode="wb")
+unzip("movements_2020_1_5.zip")
+
+url <- 'https://opendata.emtmadrid.es/getattachment/c569c188-ca83-46fc-9fc3-95e6701140b2/202006_movements.aspx'
+destfile <- "C:/opendata/202006_movements.zip"
+download.file(url, destfile,mode="wb")
+unzip("202006_movements.zip")
+
+# Leemos los archivos JSON y extraemos su información en Data Frame
+
+archivo <- "C:/opendata/202001_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+df <- ldply (out, data.frame)
+
+archivo <- "C:/opendata/202002_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+feb <- ldply (out, data.frame)
+
+archivo <- "C:/opendata/202003_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+mar <- ldply (out, data.frame)
+
+archivo <- "C:/opendata/202004_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+abr <- ldply 
+
+archivo <- "C:/opendata/202005_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+may <- ldply (out, data.frame)
+
+archivo <- "C:/opendata/202006_movements.json"
+out <- lapply(readLines(archivo), fromJSON)
+jun <- ldply (out, data.frame)
+
+#Unimos los Data Frame generados en uno solo
+
+bicimad <- rbind(df,feb,mar,abr,may,jun)
+
+
+```
+
+Ahora procedemos a descargar desde Aemet los datos de la estación de Madrid desde el 01/01/2020 hasta el 15/06/2020 para hacerlos coincidir con los datos de Bicimad descargados anteriormente.
+
+Este punto puede que no funcione en algún momento ya que el link de descarga tiene fecha de caducidad. Por ese motivo posteriormente procedo a guardar la información en un archivo .RData para que podamos trabajar con ello.
+
+```{r eval=FALSE}
+
+# Para obtener la información debemos acceder al siguiente link. Anteriormente debemos solicitar un token para poder tener acceso.
+
+# https://opendata.aemet.es/centrodedescargas/productosAEMET?
+
+# Nos generara una petición de este estilo
+
+# https://opendata.aemet.es/opendata/api/valores/climatologicos/diarios/datos/fechaini/2020-01-01T00:00:00UTC/fechafin/2020-06-15T23:59:59UTC/estacion/3195/?api_key=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqdWFubWlja0Bob3RtYWlsLmNvbSIsImp0aSI6ImNiZjA5YTc2LTgzYjgtNDhhOS04Mzg5LTMwNWZhYTRkOTU3OCIsImlzcyI6IkFFTUVUIiwiaWF0IjoxNTk1MzUzMzczLCJ1c2VySWQiOiJjYmYwOWE3Ni04M2I4LTQ4YTktODM4OS0zMDVmYWE0ZDk1NzgiLCJyb2xlIjoiIn0.nq1Fh0C0FIVw9HS4EjukhELZCKGz2GdFmbp8G4svvTo
+
+# Y esta será la URL obtenida en aemet desde donde descargaremos los datos. Esta url posiblemente caduque y no pueda ser ejecutada.
+
+url  <- "https://opendata.aemet.es/opendata/sh/d0b912eb"
+
+# Leemos los datos en JSON
+datos <- readLines(url, warn = FALSE)
+
+# Lo convertimos a dataframe
+estacion <- fromJSON(datos)
+
+```
+
+Se guarda el entorno,para ahorrarnos este proceso cada vez que queramos trabajar con los dataframe generados
+
+```{r eval=FALSE}
+#Guardamos los Dataframe generados en un único archivo para facilitar su trabajo y no tener que pasar por todo el proceso anterior cada vez que queramos trabajar con ello.
+
+save(bicimad, estacion, file = "bicimad2020.RData")
+```
+
+
+Cargamos el archivo que contiene los dataframe generados anteriormente
+
+```{r}
+
+# El archivo con los Data Frame ya generados se pueden descargar desde la siguiente url:
+# https://drive.google.com/file/d/1SwmUgxrgMgok2q8Nl5MvfDQZmYwX1Sbe/view?usp=sharing
+
+load('bicimad2020.RData')
+```
+
+## Limpieza de datos
+
+Nos ocupamos ahora de la tabla que vamos a generar a raiz de los datos de Bicimad
+
+```{r}
+# Mostramos sus primeras 10 lineas 
+head(bicimad)
+```
+
+
+```{r}
+# Mostramos su estructura
+str(bicimad)
+```
+Limpiamos el dataset con la información de Bicimad para quedarnos en este caso con la información que nos interesa, en este caso nos interesa el número de veces que se utilizan las bicis cada día del año.
+
+```{r warning=FALSE}
+# Eliminamos columnas que pueden ser utiles para otros analisis
+
+bicimad$X.oid <- NULL
+bicimad$user_day_code <- NULL
+bicimad$idplug_base <- NULL
+bicimad$idunplug_base <- NULL
+bicimad$zip_code <- NULL
+
+# Convertimos en formato fecha
+
+bicimad$fecha <- as.Date(bicimad$unplug_hourTime)
+bicimad$unplug_hourTime <- NULL
+
+# Tabla de veces que se cogen las bicis cada día en total 
+unplug <- bicimad
+unplug$user_type <- NULL
+unplug$travel_time <- NULL
+unplug$ageRange <- NULL
+unplug$idplug_station <- NULL
+
+unplug1 <- unplug %>% group_by(fecha)  %>% tally()
+names (unplug1)[2] = "vecescogen"
+
+# Tabla de veces que se dejan las bicis en total 
+
+plug <- bicimad
+plug$user_type <- NULL
+plug$travel_time <- NULL
+plug$ageRange <- NULL
+plug$idunplug_station <- NULL
+
+plug1 <- plug %>% group_by(fecha)  %>% tally()
+names (plug1)[2] = "vecesdejan"
+
+# Como las bicis son repuestas al final de cada día, es evidente que el número de veces que se cogen es igual al de veces que se dejan como se puede ver en las tablas creadas
+
+head(unplug1)
+head(plug1)
+```
+
+Ahora nos ocupamos de la información relevante para nuestro analisis de la información meteorologica recabada en Madrid.
+
+```{r}
+# Mostramos sus primeras 10 lineas 
+head(estacion)
+```
+
+
+```{r}
+# Mostramos su estructura
+str(estacion)
+```
+
+
+```{r}
+# Convertimos a formato fecha
+estacion$fecha <- as.Date(estacion$fecha)
+
+# Nos quedamos con las variables que más nos interesan en este caso para los analisis
+
+retiro <- select(estacion, fecha, tmed, velmedia, prec)
+
+head(retiro)
+```
+
+Finalmente unimos las tablas con los datos que nos interesan para poder analizarlos y contrastarlos
+
+```{r warning=FALSE}
+final <- merge(retiro, plug1, by = 'fecha')
+final <- merge(final, unplug1, by = 'fecha')
+final$velmedia[is.na(final$velmedia)] <- 0
+
+# Sumamos las columnas con los movimientos obteniendo el total de cada día
+
+final %>% select(5:6) %>% rowSums() -> final$totalmov
+
+final$velmedia <- gsub(",",".",final$velmedia)
+final$tmed <- gsub(",",".",final$tmed)
+final$prec <- gsub(",",".",final$prec)
+
+final$tmed <- as.numeric(final$tmed)
+final$prec <- as.numeric(final$prec)
+final$velmedia <- as.numeric(final$velmedia)
+
+head(final)
+```
+
+## Analisis mediante gráficos
+
+Finalmente con los datos recabados podemos hacer un analisis para ver como se relacionan los datos de uso de Bicimad con los datos meteorologicos en Madrid.
+
+En primer lugar vemos los movimientos de bicicletas que se han dado en los primeros 6 meses, se aprecia como durante el estado de alarma el servicio de bicicletas estuvo paralizado por completo y no hubo movimientos.
+
+
+```{r warning=FALSE}
+media = mean(final$totalmov)
+
+ggplot(final, aes(x=fecha, y=totalmov)) + geom_area(size=1,fill="#69b3a2", alpha=0.4) + geom_line(color="#69b3a2", size=1) + labs(title ="Uso de Bicimad de Enero a Junio", x = "Meses", y = "Cantidad de movimientos")+ geom_point(size=3, color="#69b3a2")+ theme_ipsum()+
+  geom_hline(yintercept= media, color="orange", size=.5)+
+  annotate(geom="text", x=as.Date("2020-04-01"), y=media, 
+             label="Media de 18425 mov/dia", size=3)
+
+```
+
+
+A continuación se muestra una relación entre la temperatura y el uso de Bicimad, se comprueba como a medida que la temperatura aumenta, durante la primera mitad del año, tambien aumenta el uso de bicicleta
+
+
+```{r warning=FALSE}
+
+# Valor usado para transformar los datos
+coeff <- 1000
+
+# Definimos los colores
+temperatureColor <- "#f03b20"
+movColor <- "#31a354"
+
+ggplot(final, aes(x=fecha)) +
+  
+  geom_line( aes(y=tmed), size=1, color=temperatureColor) + 
+  geom_line( aes(y=totalmov / coeff), size=1, color=movColor) +
+  
+  scale_y_continuous(
+    
+    # Personalizamos el primer eje
+    name = "Temperatura Grados",
+    
+    # Personalizamos el segundo eje y lo ajustamos
+    sec.axis = sec_axis(~.*coeff, name="Total movimientos")
+  ) + 
+  
+  theme_ipsum() +
+
+  theme(
+    axis.title.y = element_text(color = temperatureColor, size=7),
+    axis.title.y.right = element_text(color = movColor, size=7)
+  ) +
+
+  ggtitle("Si la temperatura sube, aumenta el uso")
+
+```
+
+En este otro apartado se aprecia como los días que más llueve, el uso de Bicimad desciende en la ciudad. En este caso hay pocos días de lluvia, pero se ve claramente el descenso.
+
+```{r warning=FALSE}
+# Valor usado para transformar los datos
+coeff <- 1000
+
+# Definimos los colores
+preciColor <- "#2b8cbe"
+movColor <- "#31a354"
+
+ggplot(final, aes(x=fecha)) +
+  
+  geom_line( aes(y=prec), size=1, color=preciColor) + 
+  geom_line( aes(y=totalmov / coeff), size=1, color=movColor) +
+  
+  scale_y_continuous(
+    
+    # Personalizamos el primer eje
+    name = "Precipitaciones",
+    
+    # Personalizamos el segundo eje y lo ajustamos
+    sec.axis = sec_axis(~.*coeff, name="Total movimientos")
+  ) + 
+  
+  theme_ipsum() +
+
+  theme(
+    axis.title.y = element_text(color = preciColor, size=7),
+    axis.title.y.right = element_text(color = movColor, size=7)
+  ) +
+
+  ggtitle("Los días que llueve, desciende el uso")+
+  annotate(geom="text", x=as.Date("2020-05-31"), y=37, 
+  label="Precipitación: 37,8", size=2.5) +
+  annotate(geom="point", x=as.Date("2020-05-31"), y=37, size=7, shape=21, fill="transparent") +
+  annotate(geom="text", x=as.Date("2020-05-31"), y=15, 
+  label="Movimientos: 15000", size=2.5) +
+  annotate(geom="point", x=as.Date("2020-05-31"), y=15, size=7, shape=21, fill="transparent")+
+  annotate(geom="point", x=as.Date("2020-05-12"), y=19, size=7, shape=21, fill="transparent")+
+  annotate(geom="point", x=as.Date("2020-05-12"), y=7, size=7, shape=21, fill="transparent")+
+  annotate(geom="point", x=as.Date("2020-01-24"), y=5.5, size=7, shape=21, fill="transparent")+
+  annotate(geom="point", x=as.Date("2020-01-24"), y=9, size=7, shape=21, fill="transparent")
+```
+
+Se podrian analizar con más detalle los datos, o incluso utilizar otras variables de las que hemos obtenido. Pero en este caso, no quería entrar en mayor detalle, si no, mostrar el proceso para conseguir el objetivo de obtener los datos, tratarlos y usarlos para un fin concreto.
